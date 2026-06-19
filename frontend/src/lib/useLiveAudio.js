@@ -12,6 +12,10 @@ const MIN_SPEECH_MS = 400;
 const NO_AUDIO_TIMEOUT_MS = 8000;
 const READY_TIMEOUT_MS = 30000;
 const MAX_RECONNECT = 2;
+// Time (ms) to wait after Maya finishes speaking before opening the mic.
+// This gives the browser's AEC time to settle so Maya's echo doesn't
+// feed back into Gemini and trigger another response (the "Hey there" loop).
+const POST_PLAYBACK_COOLDOWN_MS = 500;
 
 function resampleFloat32(input, fromRate, toRate) {
   if (fromRate === toRate) return input;
@@ -133,6 +137,7 @@ export function useLiveAudio({
   const cleaningUpRef = useRef(false);
   const thinkingTimerRef = useRef(null);
   const userSilenceTimerRef = useRef(null);
+  const postPlaybackCooldownRef = useRef(null);
 
   micMutedRef.current = micMuted;
   stateRef.current = state;
@@ -203,9 +208,19 @@ export function useLiveAudio({
     pttActiveRef.current = false;
   }, []);
 
+  const clearPostPlaybackCooldown = useCallback(() => {
+    if (postPlaybackCooldownRef.current) {
+      clearTimeout(postPlaybackCooldownRef.current);
+      postPlaybackCooldownRef.current = null;
+    }
+  }, []);
+
   const flushPlayback = useCallback(() => {
     playbackChainRef.current = Promise.resolve();
     stopProgressLoop();
+    // Cancel any pending mic-unlock cooldown so we don't accidentally
+    // open the mic after a flush (barge-in scenario).
+    clearPostPlaybackCooldown();
     try {
       if (playbackCtxRef.current && playbackCtxRef.current.state !== 'closed') {
         nextPlaybackTimeRef.current = playbackCtxRef.current.currentTime;
@@ -213,7 +228,7 @@ export function useLiveAudio({
     } catch {
       /* ignore */
     }
-  }, [stopProgressLoop]);
+  }, [stopProgressLoop, clearPostPlaybackCooldown]);
 
   const ensurePlaybackUnlocked = useCallback(async () => {
     if (playbackCtxRef.current?.state === 'closed') {
@@ -350,10 +365,18 @@ export function useLiveAudio({
   const afterPlaybackIdle = useCallback(() => {
     stopProgressLoop();
     emitPlaybackProgress();
-    unlockMicAfterMayaTurn();
-    setState('listening');
-    startUserSilenceTimer();
-  }, [stopProgressLoop, emitPlaybackProgress, unlockMicAfterMayaTurn, startUserSilenceTimer]);
+    // Wait for the AEC to settle before opening the mic. Without this delay,
+    // Maya's voice echo leaks into the mic stream right after playback ends,
+    // VAD fires on the echo, and Gemini triggers another Maya response — the loop.
+    clearPostPlaybackCooldown();
+    postPlaybackCooldownRef.current = setTimeout(() => {
+      postPlaybackCooldownRef.current = null;
+      if (!callActiveRef.current || micMutedRef.current) return;
+      unlockMicAfterMayaTurn();
+      setState('listening');
+      startUserSilenceTimer();
+    }, POST_PLAYBACK_COOLDOWN_MS);
+  }, [stopProgressLoop, emitPlaybackProgress, clearPostPlaybackCooldown, unlockMicAfterMayaTurn, startUserSilenceTimer]);
 
   const armNoAudioWatchdog = useCallback(() => {
     clearNoAudioTimer();
@@ -475,6 +498,7 @@ export function useLiveAudio({
       clearNoAudioTimer();
       clearThinkingTimer();
       clearUserSilenceTimer();
+      clearPostPlaybackCooldown();
       wsRef.current = null;
       playbackChainRef.current = Promise.resolve();
       greetingSentRef.current = false;
@@ -510,7 +534,7 @@ export function useLiveAudio({
     } finally {
       cleaningUpRef.current = false;
     }
-  }, [stopProgressLoop, clearNoAudioTimer, clearThinkingTimer, clearUserSilenceTimer]);
+  }, [stopProgressLoop, clearNoAudioTimer, clearThinkingTimer, clearUserSilenceTimer, clearPostPlaybackCooldown]);
 
   const openWebSocket = useCallback(
     (resume = false, { forCall = false } = {}) =>
@@ -833,6 +857,7 @@ export function useLiveAudio({
         playbackChainRef.current = Promise.resolve();
         clearThinkingTimer();
         clearUserSilenceTimer();
+        clearPostPlaybackCooldown();
         resetUserVad();
         const ws = wsRef.current;
         if (ws?.readyState === WebSocket.OPEN) {
@@ -858,7 +883,7 @@ export function useLiveAudio({
 
       return next;
     });
-  }, [flushPlayback, clearThinkingTimer, clearUserSilenceTimer, resetUserVad]);
+  }, [flushPlayback, clearThinkingTimer, clearUserSilenceTimer, clearPostPlaybackCooldown, resetUserVad]);
 
   const pttDown = useCallback(() => {
     pttActiveRef.current = true;

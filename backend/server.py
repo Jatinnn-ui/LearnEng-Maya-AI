@@ -1330,9 +1330,13 @@ async def maya_live_ws(
                         if phase and phase != last_phase_injected and live_session is not None:
                             last_phase_injected = phase
                             try:
-                                await live_session.send_realtime_input(
-                                    text=f"[Tutor note — do not read aloud: {phase}]"
-                                )
+                                # Delay phase injection slightly to avoid Gemini immediately
+                                # treating it as a cue to speak before the user responds.
+                                await asyncio.sleep(0.3)
+                                if live_session is not None and not mic_paused:
+                                    await live_session.send_realtime_input(
+                                        text=f"[Tutor note — do not read aloud: {phase}]"
+                                    )
                             except Exception:
                                 logger.debug("phase injection skipped")
 
@@ -1375,12 +1379,16 @@ async def maya_live_ws(
                         ):
                             stuck_nudge_sent = True
                             try:
-                                await live_session.send_realtime_input(
-                                    text=(
-                                        "[Tutor note — do not read aloud: learner gave very short replies. "
-                                        "Offer ONE simple phrase they can repeat, then ask an easy question.]"
+                                # Small delay so Gemini doesn't treat the tutor note
+                                # as a cue to speak before waiting for the user.
+                                await asyncio.sleep(0.3)
+                                if live_session is not None and not mic_paused:
+                                    await live_session.send_realtime_input(
+                                        text=(
+                                            "[Tutor note — do not read aloud: learner gave very short replies. "
+                                            "Offer ONE simple phrase they can repeat, then ask an easy question.]"
+                                        )
                                     )
-                                )
                             except Exception:
                                 logger.debug("stuck nudge skipped")
 
