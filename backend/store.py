@@ -39,7 +39,12 @@ async def init_store() -> str:
         try:
             from motor.motor_asyncio import AsyncIOMotorClient
 
-            _mongo_client = AsyncIOMotorClient(MONGO_URL, serverSelectionTimeoutMS=5000)
+            _mongo_kwargs = {"serverSelectionTimeoutMS": 5000}
+            # Atlas (mongodb+srv://) requires TLS; enable it explicitly so the
+            # handshake succeeds regardless of driver defaults.
+            if "mongodb+srv://" in MONGO_URL or "mongodb.net" in MONGO_URL:
+                _mongo_kwargs["tls"] = True
+            _mongo_client = AsyncIOMotorClient(MONGO_URL, **_mongo_kwargs)
             _mongo_db = _mongo_client[DB_NAME]
             await _mongo_client.admin.command("ping")
             _backend = "mongo"
