@@ -86,6 +86,13 @@ app = FastAPI(title="EngLearn.ai API", lifespan=lifespan)
 api = APIRouter(prefix="/api")
 security = HTTPBearer(auto_error=False)
 
+
+# Root route for platform health checks (probes GET/HEAD "/").
+@app.get("/")
+@app.head("/")
+async def root_health():
+    return {"status": "ok", "app": "EngLearn.ai", "api": "/api"}
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("englearn")
 
