@@ -1,5 +1,7 @@
-# Keep the build context small and exclude secrets
-frontend/
+# Keep the build context small and exclude secrets.
+# NOTE: do NOT exclude frontend/ here — the frontend service builds from the
+# repo root context and needs its Dockerfile + source. The backend Dockerfile
+# only copies backend/, so leaving frontend/ in the context is harmless.
 **/venv/
 **/.venv/
 **/__pycache__/
