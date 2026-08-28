@@ -40,7 +40,7 @@ function float32ToPcm16(f32) {
   const out = new Int16Array(f32.length);
   for (let i = 0; i < f32.length; i++) {
     const s = Math.max(-1, Math.min(1, f32[i]));
-    out[i] = s < 0 ? s * 0x8000 : 0x7fff;
+    out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
   }
   return out;
 }

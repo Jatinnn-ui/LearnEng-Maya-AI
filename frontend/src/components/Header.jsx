@@ -67,15 +67,29 @@ export default function Header() {
           </nav>
         ) : (
           <nav className="hidden md:flex items-center gap-8 text-sm text-stone-600">
-            {marketingLinks.map((item) => (
-              <a
-                key={item.href}
-                href={onLanding ? item.href : `/${item.href}`}
-                className="hover:text-stone-900 transition-colors"
-              >
-                {item.label}
-              </a>
-            ))}
+            {marketingLinks.map((item) => {
+              const hash = item.href.replace(/^#/, '');
+              const scrollToSection = (e) => {
+                if (!onLanding) return; // off-landing: let the browser navigate to /#hash
+                e.preventDefault();
+                document
+                  .getElementById(hash)
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                if (window.history?.replaceState) {
+                  window.history.replaceState(null, '', item.href);
+                }
+              };
+              return (
+                <a
+                  key={item.href}
+                  href={onLanding ? item.href : `/${item.href}`}
+                  onClick={scrollToSection}
+                  className="hover:text-stone-900 transition-colors"
+                >
+                  {item.label}
+                </a>
+              );
+            })}
           </nav>
         )}
 

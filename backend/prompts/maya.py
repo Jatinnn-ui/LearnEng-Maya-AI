@@ -1,8 +1,15 @@
 """Maya tutor prompts, scenarios, and pedagogy — versioned for iteration."""
 from __future__ import annotations
 
+import hashlib
 import os
 from datetime import date
+
+
+def _stable_hash(value: str) -> int:
+    """Deterministic hash across process restarts (builtin hash() is salted per-process)."""
+    digest = hashlib.sha256((value or "0").encode("utf-8")).hexdigest()
+    return int(digest[:8], 16)
 
 PROMPT_VERSION = os.environ.get("MAYA_PROMPT_VERSION", "v2")
 
@@ -321,7 +328,7 @@ def session_goal_for_level(level: str, user_id: str = "") -> str:
     goals = SESSION_GOALS.get(level, SESSION_GOALS["Beginner"])
     if not goals:
         return ""
-    idx = (date.today().toordinal() + hash(user_id or "0")) % len(goals)
+    idx = (date.today().toordinal() + _stable_hash(user_id or "0")) % len(goals)
     return goals[idx]
 
 
@@ -339,7 +346,7 @@ def phase_instruction(scenario: dict, maya_turn_count: int) -> str:
 def daily_mission_for_user(user_id: str, last_mission_date: str | None = None) -> dict:
     today = date.today().isoformat()
     missions = DAILY_MISSIONS
-    idx = (date.today().toordinal() + hash(user_id)) % len(missions)
+    idx = (date.today().toordinal() + _stable_hash(user_id)) % len(missions)
     if last_mission_date == today:
         idx = (idx + 1) % len(missions)
     mission = dict(missions[idx])

@@ -80,6 +80,10 @@ def _row_to_dict(row) -> dict:
     d = dict(row)
     if "correction" in d and isinstance(d["correction"], str):
         d["correction"] = json.loads(d["correction"]) if d["correction"] else None
+    # vocab is stored as JSONB in Postgres and comes back as a JSON string;
+    # parse it so callers get a list (matching the Mongo backend).
+    if "vocab" in d and isinstance(d["vocab"], str):
+        d["vocab"] = json.loads(d["vocab"]) if d["vocab"] else []
     for k, v in d.items():
         if hasattr(v, "isoformat"):
             d[k] = v.isoformat()

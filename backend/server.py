@@ -295,6 +295,21 @@ def build_live_config(system_inst: str, maya_voice: str, ptt_mode: bool) -> dict
     return cfg
 
 
+def _resolve_google_api_key() -> str:
+    """Effective Gemini key: prefer GOOGLE_API_KEY, fall back to a real EMERGENT_LLM_KEY.
+
+    Keeps /health, /voice/status, and the live WS in sync with the key that
+    LlmChat (classic /chat & /hint) actually uses.
+    """
+    key = os.environ.get("GOOGLE_API_KEY", "").strip()
+    if key:
+        return key
+    emergent = os.environ.get("EMERGENT_LLM_KEY", "").strip()
+    if emergent and not emergent.startswith("sk-emergent"):
+        return emergent
+    return ""
+
+
 def _is_valid_google_api_key(key: str) -> bool:
     return key.startswith("AIza") or key.startswith("AQ.")
 
@@ -790,7 +805,7 @@ async def get_messages(session_id: str, user: dict = Depends(get_current_user)):
 @api.get("/health")
 async def health():
     load_dotenv(ROOT_DIR / ".env", override=True)
-    api_key = os.environ.get("GOOGLE_API_KEY", "").strip()
+    api_key = _resolve_google_api_key()
     key_err = _google_key_error_message(api_key)
     db_ok = await store.ping()
     return {
@@ -807,7 +822,7 @@ async def health():
 @api.get("/voice/status")
 async def voice_status():
     load_dotenv(ROOT_DIR / ".env", override=True)
-    api_key = os.environ.get("GOOGLE_API_KEY", "").strip()
+    api_key = _resolve_google_api_key()
     live_model = os.environ.get("LIVE_MODEL", LIVE_MODEL).strip()
     key_err = _google_key_error_message(api_key)
     if key_err:
@@ -1002,7 +1017,7 @@ async def maya_live_ws(
     """Bidirectional audio bridge: browser <-> Gemini Live. Audio in: PCM16 16kHz. Audio out: PCM16 24kHz."""
     await websocket.accept()
     load_dotenv(ROOT_DIR / ".env", override=True)
-    api_key = os.environ.get("GOOGLE_API_KEY", "").strip()
+    api_key = _resolve_google_api_key()
     live_model = os.environ.get("LIVE_MODEL", LIVE_MODEL).strip()
     key_err = _google_key_error_message(api_key)
     if not GOOGLE_GENAI_AVAILABLE or key_err:
