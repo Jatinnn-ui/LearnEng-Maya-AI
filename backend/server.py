@@ -87,9 +87,11 @@ api = APIRouter(prefix="/api")
 security = HTTPBearer(auto_error=False)
 
 
-# Root route for platform health checks (probes GET/HEAD "/").
+# Root routes for platform health checks (some probe "/", some "/frontend").
 @app.get("/")
 @app.head("/")
+@app.get("/frontend")
+@app.head("/frontend")
 async def root_health():
     return {"status": "ok", "app": "EngLearn.ai", "api": "/api"}
 
