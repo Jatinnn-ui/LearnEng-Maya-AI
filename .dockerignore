@@ -1,0 +1,14 @@
+# Keep the build context small and exclude secrets
+frontend/
+**/venv/
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/.env
+**/.env.*
+**/*.env
+**/node_modules/
+.git/
+**/tests/
+**/.pytest_cache/
+*.md
